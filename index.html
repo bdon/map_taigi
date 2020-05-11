@@ -1,0 +1,144 @@
+<html lang="en">
+  <head>
+    <title>台語地圖</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta property="og:url" content="https://protomaps.com/lab/taigi"/>
+    <meta property="og:name" content="台語地圖"/>
+    <meta property="og:image" content="https://protomaps.com/static/lab/taigi-og.jpg"/>
+    <meta property="og:image:height" content="1450"/>
+    <meta property="og:image:width" content="964"/>
+    <link rel="stylesheet" href="https://unpkg.com/tachyons@4.12.0/css/tachyons.min.css"/>
+    <link rel="stylesheet" href="https://cdn.protomaps.com/mapbox-gl-js/1.8.0/mapbox-gl.css" integrity="sha384-hA8DiLlBPc66p22tExfBNlfvPjhPR7uLymTlWBr9tlH5mqWYJDerJpGUNlqU3ne6" crossorigin="anonymous">
+    <script src="https://cdn.protomaps.com/mapbox-gl-js/1.8.0/mapbox-gl.js" integrity="sha384-+OoYp/YzRKWaa9wH3YadmXwczp/YB8E+l8ekdzF7KqXX5bm9pMmkJYgDiZj/2WSd" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/long@4.0.0/dist/long.js" integrity="sha384-Fu3lKslGGwhEHCsZmhCrP3OdAC8Lw4OxTNq1JoIDzzF4t6fotQ42zghe67N9ZNMP" crossorigin="anonymous"></script>
+    <style>
+      .root {
+        height:100%;
+        width:100%;
+        display:table;
+        table-layout: fixed;
+      }
+
+      #map {
+        height:100%;
+        display:table-row;
+      }
+    </style>
+  </head>
+  <body class="sans-serif">
+    <div class="w-100 vh-100">
+      <div class="root">
+        <div class="bg-light-gray ph2">
+          <nav class="w-100 pv1">
+            <span class="f5 fw1">台灣台語地圖</span>
+            <span class="fr">
+              <a class="black" href="https://github.com/bdon/map_taigi" target="_blank">github.com/bdon/map_taigi</a>
+            </span>
+          </nav>
+        </div>
+        <div id="map"></div>
+      </div>
+      <script>
+        window.addEventListener('load',function() {
+          var map = new mapboxgl.Map({
+            container: 'map',
+            style: '/style.json',
+            center: [121.54559,25.03638],
+            zoom: 11.9,
+            hash: true,
+            attributionControl:false
+          })
+          map.addControl(new mapboxgl.AttributionControl({
+            compact: false
+          }));
+
+          const interactive_layers = ['place_village_true','place_village_false','place_city_true','place_city_false','parks_label_true','parks_label_false','road_label_minor_true','road_label_minor_false','road_label_major_true','road_label_major_false','peak_label_false','peak_label_true']
+
+          var hoveredStateId = null
+          var hoveredStateSrcLayer = null
+
+          for (var layer of interactive_layers) {
+            map.on('click', layer, (e) => {
+
+              var lngLat = e.lngLat
+              if (e.features[0].geometry.type == 'Point') {
+                lngLat = e.features[0].geometry.coordinates.slice()
+              }
+
+              var feature_id = e.features[0].id
+              const l = new Long.fromNumber(feature_id)
+              const layer = l.shru(46).toInt()
+              const type = l.shru(44).and(3).toInt()
+              const mask = Long.MAX_UNSIGNED_VALUE.shru(64-44)
+              const source_id = l.and(mask).toString()
+
+              var type_str;
+              if (type === 1) type_str = 'node'
+              else if (type === 2) type_str = 'way'
+              else if (type === 3) type_str = 'relation'
+              else {
+                // zoom in
+                map.flyTo({
+                  center:lngLat,
+                  zoom:14
+                })
+                return
+              }
+
+              var html = `<div>
+                <div class="pa1">
+                <div>name:zh: ${e.features[0].properties['name:zh']}</div>
+                <div>name:nan: ${e.features[0].properties['name:nan'] || "?" }</div>
+                <a class="green f5" target="_blank" href="https://openstreetmap.org/note/new#map=${15}/${lngLat.lat}/${lngLat.lng}&layers=N">提供讀音</a>
+                </div>
+                <div class="bg-light-gray pa1 mt2">
+                  <div>進階功能</div>
+                  <a class="green" target="_blank" href="https://itaigi.tw/k/${e.features[0].properties['name:zh']}">iTaigi</a>
+                  <a class="green" target="_blank" href="https://openstreetmap.org/edit?${type_str}=${source_id}">直接編輯資料</a>
+                  <a class="green" target="_blank" href="https://www.openstreetmap.org/api/0.6/${type_str}/${source_id}">下載XML</a><br>
+                  <a class="green" target="_blank" href="https://www.openstreetmap.org/${type_str}/${source_id}/history">去OSM</a>
+                  <a class="green" target="_blank" href="https://osmlab.github.io/osm-deep-history/#/${type_str}/${source_id}">Deep History</a>
+                </div>
+              </div>`
+               
+              new mapboxgl.Popup({offset:[0,-18]})
+              .setLngLat(lngLat)
+              .setHTML(html)
+              .addTo(map);
+            })
+
+            map.on('mousemove', layer, function(e) {
+              if (e.features.length > 0) {
+                if (hoveredStateId) {
+                  map.setFeatureState(
+                  { source: 'protomaps', sourceLayer:hoveredStateSrcLayer, id: hoveredStateId },
+                  { hover: false }
+                  );
+                  }
+                  hoveredStateId = e.features[0].id;
+                  hoveredStateSrcLayer = e.features[0].layer['source-layer']
+                  map.setFeatureState(
+                  { source: 'protomaps', sourceLayer:hoveredStateSrcLayer, id: hoveredStateId },
+                  { hover: true }
+                );
+               map.getCanvas().style.cursor = 'pointer';
+              }
+            });
+
+            map.on('mouseleave', layer, function() {
+              if (hoveredStateId) {
+                map.setFeatureState(
+                { source: 'protomaps',sourceLayer:hoveredStateSrcLayer, id: hoveredStateId },
+                { hover: false }
+                );
+              }
+              hoveredStateId = null;
+              map.getCanvas().style.cursor = '';
+            });
+          }
+        })
+      </script>
+    </div>
+  </body>
+</html>
