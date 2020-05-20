@@ -78,12 +78,17 @@
               else if (type === 2) type_str = 'way'
               else if (type === 3) type_str = 'relation'
               else {
-                // zoom in
                 map.flyTo({
                   center:lngLat,
                   zoom:14
                 })
                 return
+              }
+
+              var itaigi_token = e.features[0].properties['name:zh']
+              // 把最後「市，區」字刪掉
+              if (itaigi_token.endsWith("市") || itaigi_token.endsWith("區")) {
+                itaigi_token = itaigi_token.substring(0,itaigi_token.length - 1)
               }
 
               var html = `<div>
@@ -94,7 +99,7 @@
                 </div>
                 <div class="bg-light-gray pa1 mt2">
                   <div>進階功能</div>
-                  <a class="green" target="_blank" href="https://itaigi.tw/k/${e.features[0].properties['name:zh']}">iTaigi</a>
+                  <a class="green" target="_blank" href="https://itaigi.tw/k/${itaigi_token}">iTaigi</a>
                   <a class="green" target="_blank" href="https://openstreetmap.org/edit?${type_str}=${source_id}">直接編輯資料</a>
                   <a class="green" target="_blank" href="https://www.openstreetmap.org/api/0.6/${type_str}/${source_id}">下載XML</a><br>
                   <a class="green" target="_blank" href="https://www.openstreetmap.org/${type_str}/${source_id}/history">去OSM</a>
